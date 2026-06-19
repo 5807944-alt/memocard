@@ -1,20 +1,590 @@
-{
-  "name": "MemoCard 암기 카드",
-  "short_name": "MemoCard",
-  "description": "질문/정답 기반 반복 암기 카드 앱 — 암기율과 답변시간 기준으로 자동 이관",
-  "start_url": "./index.html",
-  "scope": "./",
-  "id": "memocard",
-  "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#f5f6f8",
-  "theme_color": "#4f46e5",
-  "lang": "ko",
-  "dir": "ltr",
-  "categories": ["education", "productivity"],
-  "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ]
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="MemoCard">
+<title>MemoCard · 암기 카드</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --ink:#1b1c1f; --muted:#6b7280; --line:#e6e8ec;
+    --primary:#4f46e5; --primary-soft:#eef2ff; --primary-ink:#3730a3;
+    --success:#059669; --success-soft:#ecfdf5; --success-ink:#065f46;
+    --danger:#dc2626; --danger-soft:#fef2f2;
+    --amber:#d97706; --amber-soft:#fff7ed; --amber-ink:#92400e;
+    --radius:16px; --shadow:0 1px 2px rgba(16,18,22,.06),0 4px 16px rgba(16,18,22,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1115; --card:#181b21; --ink:#eceef2; --muted:#9aa1ad; --line:#262a32;
+      --primary:#7c74f0; --primary-soft:#20223a; --primary-ink:#c3befb;
+      --success:#34d399; --success-soft:#10241d; --success-ink:#7bdcb6;
+      --danger:#f87171; --danger-soft:#2a1414;
+      --amber:#fbbf24; --amber-soft:#2a1f10; --amber-ink:#f6c768;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR","Apple SD Gothic Neo",Roboto,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  .app{max-width:520px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;
+    padding-bottom:calc(72px + env(safe-area-inset-bottom));}
+  .top{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 86%,transparent);
+    backdrop-filter:saturate(140%) blur(8px);padding:14px 16px 10px;
+    padding-top:calc(14px + env(safe-area-inset-top));border-bottom:1px solid var(--line);}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:600;font-size:17px;letter-spacing:-.2px}
+  .dot{width:22px;height:22px;border-radius:7px;background:var(--primary);display:grid;place-items:center;color:#fff;font-size:13px;font-weight:700}
+  .counters{display:flex;gap:10px;margin-top:11px}
+  .pill{flex:1;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:9px 12px;box-shadow:var(--shadow)}
+  .pill .n{font-size:20px;font-weight:700;letter-spacing:-.5px}
+  .pill .l{font-size:11.5px;color:var(--muted);margin-top:1px}
+  .pill.ok .n{color:var(--success)}
+  .pill.go .n{color:var(--primary)}
+
+  main{flex:1;padding:16px}
+  .view{display:none}
+  .view.on{display:block}
+
+  .chips{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:13px;-ms-overflow-style:none;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:none;border:1px solid var(--line);background:var(--card);color:var(--muted);
+    border-radius:999px;padding:7px 13px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .chip.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+  .chip:active{transform:scale(.96)}
+
+  .qcard{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:18px;min-height:300px;display:flex;flex-direction:column}
+  .qmeta{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .qmeta .left{display:flex;gap:6px;flex-wrap:wrap}
+  .qmeta .right{display:flex;gap:8px}
+  .stat{font-size:11.5px;color:var(--muted);background:var(--bg);border:1px solid var(--line);
+    border-radius:999px;padding:3px 9px;display:inline-flex;align-items:center;gap:4px}
+  .stat b{color:var(--ink);font-weight:600}
+  .tag{font-size:11px;color:var(--primary-ink);background:var(--primary-soft);border-radius:999px;padding:3px 9px;font-weight:600;white-space:nowrap}
+  .qbody{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;padding:22px 6px}
+  .qtext{font-size:21px;font-weight:600;letter-spacing:-.3px;white-space:pre-wrap;word-break:keep-all}
+  .answer{border-top:1px dashed var(--line);padding-top:14px;margin-top:6px;min-height:54px}
+  .answer .label{font-size:11.5px;color:var(--muted);margin-bottom:4px}
+  .answer .atext{font-size:16px;color:var(--success);font-weight:600;white-space:pre-wrap;word-break:keep-all}
+  .answer .hint{font-size:13px;color:var(--muted)}
+  .reveal-bar{display:flex;align-items:center;gap:8px;margin-top:10px}
+  .reveal-bar .track{flex:1;height:5px;border-radius:999px;background:var(--line);overflow:hidden}
+  .reveal-bar .fill{height:100%;background:var(--amber);width:100%}
+  .reveal-bar .sec{font-size:12px;color:var(--amber-ink);font-weight:600;min-width:26px;text-align:right}
+
+  .actions{display:flex;gap:11px;margin-top:14px}
+  .btn{flex:1;border:none;border-radius:14px;padding:15px;font-size:16px;font-weight:600;cursor:pointer;
+    font-family:inherit;transition:transform .06s ease}
+  .btn:active{transform:scale(.97)}
+  .btn.know{background:var(--primary);color:#fff}
+  .btn.dunno{background:var(--amber-soft);color:var(--amber-ink);border:1px solid color-mix(in srgb,var(--amber) 35%,transparent)}
+  .btn.next{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+
+  .empty{text-align:center;color:var(--muted);padding:50px 20px}
+  .empty .big{font-size:30px;margin-bottom:8px}
+  .empty .go{color:var(--primary);font-weight:600;cursor:pointer}
+
+  .section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:16px;margin-bottom:16px}
+  .section h2{margin:0 0 13px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:7px}
+  .section h2 .ic{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-size:12px;flex:none}
+  .ic.p{background:var(--primary-soft);color:var(--primary-ink)}
+  .ic.s{background:var(--success-soft);color:var(--success-ink)}
+  .ic.g{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+  .ic.b{background:var(--amber-soft);color:var(--amber-ink)}
+  label.field{display:block;margin-bottom:11px}
+  label.field .ft{font-size:12.5px;color:var(--muted);margin-bottom:5px;display:block}
+  input,textarea{width:100%;font-family:inherit;font-size:15.5px;color:var(--ink);background:var(--bg);
+    border:1px solid var(--line);border-radius:11px;padding:11px 12px;outline:none}
+  input:focus,textarea:focus{border-color:var(--primary);background:var(--card)}
+  textarea{resize:vertical;min-height:48px}
+  .row{display:flex;gap:10px}
+  .row .field{flex:1}
+  .save{width:100%;background:var(--primary);color:#fff;border:none;border-radius:12px;padding:13px;
+    font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:2px}
+  .save:active{transform:scale(.99)}
+  .help{font-size:11.5px;color:var(--muted);margin-top:-6px;margin-bottom:11px;line-height:1.45}
+
+  .databtns{display:flex;gap:10px}
+  .databtns .save{flex:1;margin-top:0}
+  .save.alt{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+  .save.danger{background:transparent;color:var(--danger);border:1px solid color-mix(in srgb,var(--danger) 35%,transparent);margin-top:10px}
+
+  .list{display:flex;flex-direction:column;gap:9px}
+  .item{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+  .item .q{flex:1;min-width:0}
+  .item .q .t{font-size:14.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item .q .a{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item .q .meta{display:flex;gap:6px;align-items:center;margin-top:3px}
+  .item .q .mini{font-size:11px;color:var(--muted)}
+  .iconbtn{border:1px solid var(--line);background:var(--card);border-radius:9px;width:34px;height:34px;
+    font-size:14px;cursor:pointer;color:var(--muted);flex:none}
+  .iconbtn.del{color:var(--danger)}
+  .iconbtn:active{transform:scale(.94)}
+  .listempty{font-size:13px;color:var(--muted);text-align:center;padding:16px 0}
+  .badge{font-size:11.5px;color:var(--muted);font-weight:500}
+
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:6;background:color-mix(in srgb,var(--card) 92%,transparent);
+    backdrop-filter:blur(10px);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+  nav button{flex:1;background:none;border:none;padding:11px 0 9px;font-family:inherit;cursor:pointer;
+    color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11.5px;font-weight:500}
+  nav button .ni{font-size:20px;line-height:1}
+  nav button.active{color:var(--primary)}
+
+  .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(12px);z-index:20;
+    background:var(--ink);color:var(--bg);font-size:13.5px;font-weight:500;padding:11px 16px;border-radius:999px;
+    box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:90%;text-align:center}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><span class="dot">M</span> MemoCard</div>
+    <div class="counters">
+      <div class="pill ok"><div class="n" id="cnt-done">0</div><div class="l">암기 성공</div></div>
+      <div class="pill go"><div class="n" id="cnt-learn">0</div><div class="l">암기 중</div></div>
+    </div>
+  </header>
+
+  <main>
+    <section id="view-quiz" class="view on">
+      <div class="chips" id="quiz-scope"></div>
+      <div id="quiz-mount"></div>
+    </section>
+
+    <section id="view-manage" class="view">
+      <div class="section">
+        <h2><span class="ic p">＋</span> 질문 작성 <span id="edit-tag" class="badge" style="display:none">· 수정 중</span></h2>
+        <label class="field"><span class="ft">질문</span>
+          <textarea id="in-q" placeholder="예) 谢谢 의 뜻은?"></textarea></label>
+        <label class="field"><span class="ft">정답</span>
+          <textarea id="in-a" placeholder="예) 고맙습니다"></textarea></label>
+        <label class="field"><span class="ft">분류 (선택)</span>
+          <input id="in-cat" list="catlist" placeholder="예) 중국어 · 광학 · 일반"><datalist id="catlist"></datalist></label>
+        <button class="save" id="btn-add">질문 추가</button>
+        <button class="save alt" id="btn-canceledit" style="display:none;margin-top:8px">수정 취소</button>
+      </div>
+
+      <div class="section">
+        <h2><span class="ic g">⚙</span> 암기 기준 설정</h2>
+        <div class="row">
+          <label class="field"><span class="ft">암기율 (%)</span><input id="set-rate" type="number" min="1" max="100" inputmode="numeric"></label>
+          <label class="field"><span class="ft">최소 답변 횟수</span><input id="set-count" type="number" min="1" inputmode="numeric"></label>
+        </div>
+        <div class="row">
+          <label class="field"><span class="ft">평균 답변시간 (초 이하)</span><input id="set-time" type="number" min="1" step="0.5" inputmode="decimal"></label>
+          <label class="field"><span class="ft">정답 노출 시간 (초)</span><input id="set-reveal" type="number" min="1" inputmode="numeric"></label>
+        </div>
+        <div class="row">
+          <label class="field"><span class="ft">기록 제외 기준 (초 초과 시 평균 제외)</span><input id="set-exclude" type="number" min="1" inputmode="numeric"></label>
+        </div>
+        <p class="help">세 조건을 모두 만족하면 자동으로 성공 목록으로 이관됩니다 — 답변 횟수 ≥ 기준, 암기율 ≥ 기준, 평균 답변시간 ≤ 기준.<br>답변시간이 '기록 제외 기준'을 넘으면(앱을 켜둔 채 자리를 비운 경우 등) 평균 답변시간 계산에서 제외됩니다. 단 암기율(안다 비율)에는 그대로 반영됩니다.</p>
+        <button class="save" id="btn-savesettings">기준 저장</button>
+      </div>
+
+      <div class="section">
+        <h2><span class="ic b">⤓</span> 데이터 백업 / 복원</h2>
+        <div class="databtns">
+          <button class="save alt" id="btn-export">내보내기 (.json)</button>
+          <button class="save alt" id="btn-import">가져오기</button>
+        </div>
+        <p class="help" style="margin-top:11px;margin-bottom:0">내보내기로 받은 백업 파일을 다른 기기에서 가져오면 질문·기록·설정이 그대로 복원됩니다. 가져오기는 현재 데이터를 교체합니다.</p>
+        <input type="file" id="file-import" accept="application/json,.json" style="display:none">
+        <button class="save danger" id="btn-reset">전체 초기화</button>
+      </div>
+
+      <div class="section">
+        <h2><span class="ic p">▦</span> 암기 중 목록 <span id="learn-badge" class="badge"></span></h2>
+        <div class="chips" id="manage-filter"></div>
+        <div class="list" id="learn-list"></div>
+      </div>
+
+      <div class="section">
+        <h2><span class="ic s">✓</span> 성공 암기 목록 <span id="done-badge" class="badge"></span></h2>
+        <div class="list" id="done-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <nav>
+    <button id="nav-quiz" class="active" onclick="switchView('quiz')"><span class="ni">◎</span>암기</button>
+    <button id="nav-manage" onclick="switchView('manage')"><span class="ni">≣</span>관리</button>
+  </nav>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  const KEY="memocard.v1";
+  const MAX_DONE=100;
+
+  const Store={
+    _mem:null,
+    load(){ try{const r=localStorage.getItem(KEY);return r?JSON.parse(r):null;}catch(e){return this._mem;} },
+    save(d){ try{localStorage.setItem(KEY,JSON.stringify(d));}catch(e){this._mem=d;} }
+  };
+
+  function uid(){ return Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-3); }
+  function newQ(q,a,cat){ return {id:uid(),q,a,cat:cat||"",know:0,total:0,timeSum:0,timeCount:0,mastered:false,createdAt:Date.now()}; }
+  function seed(){ return [
+    newQ("谢谢 의 뜻은?","고맙습니다","중국어"),
+    newQ("MTF 가 측정하는 것은?","렌즈의 공간 주파수별 대비(콘트라스트) 전달 특성","광학"),
+    newQ("Active Alignment(AA) 의 목적은?","센서면과 렌즈 상면을 정밀 정렬해 전 화각 해상력 최적화","광학")
+  ]; }
+  function makeDefaults(){ return {settings:{rate:80,count:5,time:5,reveal:3,excludeOver:5},questions:seed(),quizScope:""}; }
+  function normalizeQ(o){ return {
+    id:o.id||uid(), q:String(o.q||""), a:String(o.a||""), cat:String(o.cat||""),
+    know:+o.know||0, total:+o.total||0, timeSum:+o.timeSum||0,
+    timeCount:(o.timeCount!=null? +o.timeCount : (+o.total||0)),
+    mastered:!!o.mastered, createdAt:o.createdAt||Date.now()
+  };}
+
+  let state=Store.load();
+  if(!state||!Array.isArray(state.questions)) state=makeDefaults();
+  state.settings=Object.assign({rate:80,count:5,time:5,reveal:3,excludeOver:5},state.settings||{});
+  state.questions=state.questions.map(normalizeQ);
+  if(typeof state.quizScope!=="string") state.quizScope="";
+  Store.save(state);
+
+  function persist(){ Store.save(state); }
+
+  const all=()=>state.questions;
+  const learning=()=>all().filter(q=>!q.mastered);
+  const mastered=()=>all().filter(q=>q.mastered);
+  const learningIn=(scope)=>learning().filter(q=>scope===""||q.cat===scope);
+  function categories(){ return [...new Set(all().map(q=>q.cat).filter(Boolean))].sort(); }
+  function rateOf(q){ return q.total? Math.round(q.know/q.total*100):null; }
+  function avgOf(q){ return q.timeCount? q.timeSum/q.timeCount:null; }
+  function meetsCriteria(q){
+    const s=state.settings;
+    if(q.total<s.count) return false;
+    if(rateOf(q)<s.rate) return false;
+    const avg=avgOf(q);
+    if(avg===null||avg>s.time) return false;
+    return true;
+  }
+  function fmtRate(q){ const r=rateOf(q); return r===null?"—":r+"%"; }
+  function fmtAvg(q){ const a=avgOf(q); return a===null?"—":a.toFixed(1)+"s"; }
+
+  let toastTimer;
+  function toast(msg){
+    const t=document.getElementById("toast");
+    t.textContent=msg; t.classList.add("show");
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2000);
+  }
+
+  function switchView(v){
+    document.getElementById("view-quiz").classList.toggle("on",v==="quiz");
+    document.getElementById("view-manage").classList.toggle("on",v==="manage");
+    document.getElementById("nav-quiz").classList.toggle("active",v==="quiz");
+    document.getElementById("nav-manage").classList.toggle("active",v==="manage");
+    if(v==="quiz") renderQuiz();
+    if(v==="manage") renderManage();
+    window.scrollTo(0,0);
+  }
+  window.switchView=switchView;
+
+  function updateCounters(){
+    document.getElementById("cnt-done").textContent=mastered().length;
+    document.getElementById("cnt-learn").textContent=learning().length;
+  }
+
+  /* ---------- QUIZ ---------- */
+  let current=null, startTime=0, lastId=null, revealTimer=null, revealRAF=null;
+
+  function renderScopeChips(){
+    const cats=categories();
+    const box=document.getElementById("quiz-scope");
+    if(cats.length===0){ box.innerHTML=""; state.quizScope=""; return; }
+    if(state.quizScope!=="" && !cats.includes(state.quizScope)) state.quizScope="";
+    let html=`<button class="chip ${state.quizScope===""?"on":""}" data-scope="">전체</button>`;
+    html+=cats.map(c=>`<button class="chip ${state.quizScope===c?"on":""}" data-scope="${esc(c)}">${esc(c)}</button>`).join("");
+    box.innerHTML=html;
+    box.querySelectorAll("[data-scope]").forEach(b=>b.onclick=()=>{
+      state.quizScope=b.dataset.scope; persist(); renderQuiz();
+    });
+  }
+
+  function pickNext(){
+    const pool=learningIn(state.quizScope);
+    if(pool.length===0){ current=null; return; }
+    let cands=pool;
+    if(pool.length>1 && lastId) cands=pool.filter(q=>q.id!==lastId);
+    current=cands[Math.floor(Math.random()*cands.length)];
+  }
+
+  function renderQuiz(){
+    clearTimeout(revealTimer); cancelAnimationFrame(revealRAF);
+    updateCounters(); renderScopeChips();
+    const mount=document.getElementById("quiz-mount");
+    if(learningIn(state.quizScope).length===0){
+      current=null;
+      const scopeNote=state.quizScope?`'${esc(state.quizScope)}' 분류에 `:"";
+      mount.innerHTML=`<div class="empty"><div class="big">◎</div>
+        <div>${scopeNote}암기할 질문이 없어요.</div>
+        <div style="margin-top:6px"><span class="go" onclick="switchView('manage')">관리 탭</span>에서 질문을 추가하세요.</div></div>`;
+      return;
+    }
+    pickNext(); drawQuestion();
+  }
+
+  function drawQuestion(){
+    const q=current;
+    const tag=q.cat?`<span class="tag">${esc(q.cat)}</span>`:"";
+    document.getElementById("quiz-mount").innerHTML=`
+      <div class="qcard">
+        <div class="qmeta">
+          <div class="left">${tag}</div>
+          <div class="right">
+            <span class="stat">암기율 <b>${fmtRate(q)}</b></span>
+            <span class="stat">평균 <b>${fmtAvg(q)}</b></span>
+          </div>
+        </div>
+        <div class="qbody"><div class="qtext">${esc(q.q)}</div></div>
+        <div class="answer" id="answer-zone"><div class="hint">정답을 떠올린 뒤 버튼을 누르세요</div></div>
+        <div class="actions" id="action-zone">
+          <button class="btn dunno" id="b-dunno">모른다</button>
+          <button class="btn know" id="b-know">안다</button>
+        </div>
+      </div>`;
+    document.getElementById("b-know").onclick=()=>answer(true);
+    document.getElementById("b-dunno").onclick=()=>answer(false);
+    startTime=Date.now();
+  }
+
+  function answer(known){
+    const q=current;
+    const elapsed=(Date.now()-startTime)/1000;
+    q.total++; if(known) q.know++;
+    if(elapsed<=state.settings.excludeOver){ q.timeSum+=elapsed; q.timeCount++; }
+    lastId=q.id;
+    let promoted=false;
+    if(meetsCriteria(q)){ q.mastered=true; promoted=true; }
+    persist(); updateCounters();
+    if(known){
+      if(promoted) toast("🎉 성공 암기로 이관됐어요");
+      setTimeout(goNext,120);
+    } else { revealAnswer(promoted); }
+  }
+
+  function revealAnswer(promoted){
+    const q=current;
+    const zone=document.getElementById("answer-zone");
+    const act=document.getElementById("action-zone");
+    const secs=Math.max(1,Number(state.settings.reveal)||3);
+    zone.innerHTML=`<div class="label">정답</div><div class="atext">${esc(q.a)}</div>
+      <div class="reveal-bar"><div class="track"><div class="fill" id="rfill"></div></div><div class="sec" id="rsec">${secs}s</div></div>`;
+    act.innerHTML=`<button class="btn next" id="b-next">다음 →</button>`;
+    document.getElementById("b-next").onclick=()=>{ clearTimeout(revealTimer); cancelAnimationFrame(revealRAF); goNext(); };
+    if(promoted) toast("정답 확인 · 이번 항목 성공 이관");
+    const start=Date.now(), durMs=secs*1000;
+    const fill=document.getElementById("rfill"), secEl=document.getElementById("rsec");
+    (function tick(){
+      const left=durMs-(Date.now()-start), ratio=Math.max(0,left/durMs);
+      if(fill) fill.style.width=(ratio*100)+"%";
+      if(secEl) secEl.textContent=Math.max(0,Math.ceil(left/1000))+"s";
+      if(left>0) revealRAF=requestAnimationFrame(tick); else goNext();
+    })();
+  }
+
+  function goNext(){
+    clearTimeout(revealTimer); cancelAnimationFrame(revealRAF);
+    if(learningIn(state.quizScope).length===0){ renderQuiz(); return; }
+    pickNext(); drawQuestion();
+  }
+
+  /* ---------- MANAGE ---------- */
+  let editId=null, manageFilter="";
+
+  function renderManage(){
+    updateCounters();
+    const s=state.settings;
+    setVal("set-rate",s.rate); setVal("set-count",s.count); setVal("set-time",s.time); setVal("set-reveal",s.reveal); setVal("set-exclude",s.excludeOver);
+    renderCatList(); renderManageFilter(); renderLearnList(); renderDoneList();
+  }
+
+  function renderCatList(){
+    document.getElementById("catlist").innerHTML=categories().map(c=>`<option value="${esc(c)}">`).join("");
+  }
+
+  function renderManageFilter(){
+    const cats=categories();
+    const box=document.getElementById("manage-filter");
+    if(cats.length===0){ box.innerHTML=""; manageFilter=""; return; }
+    if(manageFilter!=="" && !cats.includes(manageFilter)) manageFilter="";
+    let html=`<button class="chip ${manageFilter===""?"on":""}" data-f="">전체</button>`;
+    html+=cats.map(c=>`<button class="chip ${manageFilter===c?"on":""}" data-f="${esc(c)}">${esc(c)}</button>`).join("");
+    box.innerHTML=html;
+    box.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{ manageFilter=b.dataset.f; renderManageFilter(); renderLearnList(); });
+  }
+
+  function itemHTML(q,actions){
+    const tag=q.cat?`<span class="tag">${esc(q.cat)}</span>`:"";
+    return `<div class="item">
+      <div class="q">
+        <div class="t">${esc(q.q)}</div>
+        <div class="a">${esc(q.a)}</div>
+        <div class="meta">${tag}<span class="mini">${fmtRate(q)} · ${fmtAvg(q)}</span></div>
+      </div>${actions}</div>`;
+  }
+
+  function renderLearnList(){
+    const list=document.getElementById("learn-list");
+    let items=learning().filter(q=>manageFilter===""||q.cat===manageFilter).sort((a,b)=>b.createdAt-a.createdAt);
+    document.getElementById("learn-badge").textContent=learning().length+"개";
+    if(items.length===0){ list.innerHTML=`<div class="listempty">표시할 질문이 없어요</div>`; return; }
+    list.innerHTML=items.map(q=>itemHTML(q,
+      `<button class="iconbtn" data-edit="${q.id}" aria-label="수정">✎</button>
+       <button class="iconbtn del" data-del="${q.id}" aria-label="삭제">🗑</button>`)).join("");
+    list.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>startEdit(b.dataset.edit));
+    list.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>delQuestion(b.dataset.del));
+  }
+
+  function renderDoneList(){
+    const list=document.getElementById("done-list");
+    const items=mastered().sort((a,b)=>b.createdAt-a.createdAt);
+    document.getElementById("done-badge").textContent=items.length+" / "+MAX_DONE;
+    if(items.length===0){ list.innerHTML=`<div class="listempty">성공한 항목이 여기에 모입니다</div>`; return; }
+    list.innerHTML=items.map(q=>itemHTML(q,
+      `<button class="iconbtn" data-relearn="${q.id}" aria-label="다시 암기">↺</button>
+       <button class="iconbtn del" data-del="${q.id}" aria-label="삭제">🗑</button>`)).join("");
+    list.querySelectorAll("[data-relearn]").forEach(b=>b.onclick=()=>relearn(b.dataset.relearn));
+    list.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>delQuestion(b.dataset.del));
+  }
+
+  function addOrUpdate(){
+    const qv=document.getElementById("in-q").value.trim();
+    const av=document.getElementById("in-a").value.trim();
+    const cv=document.getElementById("in-cat").value.trim();
+    if(!qv||!av){ toast("질문과 정답을 모두 입력하세요"); return; }
+    if(editId){
+      const q=all().find(x=>x.id===editId);
+      if(q){ q.q=qv; q.a=av; q.cat=cv; }
+      toast("수정했어요"); cancelEdit();
+    } else {
+      state.questions.push(newQ(qv,av,cv));
+      toast("질문을 추가했어요");
+      document.getElementById("in-q").value=""; document.getElementById("in-a").value="";
+    }
+    persist(); renderManage();
+  }
+
+  function startEdit(id){
+    const q=all().find(x=>x.id===id); if(!q) return;
+    editId=id;
+    document.getElementById("in-q").value=q.q;
+    document.getElementById("in-a").value=q.a;
+    document.getElementById("in-cat").value=q.cat;
+    document.getElementById("btn-add").textContent="수정 저장";
+    document.getElementById("btn-canceledit").style.display="block";
+    document.getElementById("edit-tag").style.display="inline";
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+  function cancelEdit(){
+    editId=null;
+    document.getElementById("in-q").value=""; document.getElementById("in-a").value=""; document.getElementById("in-cat").value="";
+    document.getElementById("btn-add").textContent="질문 추가";
+    document.getElementById("btn-canceledit").style.display="none";
+    document.getElementById("edit-tag").style.display="none";
+  }
+
+  function delQuestion(id){
+    const q=all().find(x=>x.id===id); if(!q) return;
+    if(!confirm("이 항목을 삭제할까요?\n\n"+q.q)) return;
+    state.questions=all().filter(x=>x.id!==id);
+    if(editId===id) cancelEdit();
+    persist(); renderManage();
+    toast("삭제했어요");
+  }
+
+  function relearn(id){
+    const q=all().find(x=>x.id===id); if(!q) return;
+    q.mastered=false; q.know=0; q.total=0; q.timeSum=0; q.createdAt=Date.now();
+    persist(); renderManage();
+    toast("다시 암기 목록으로 이동했어요");
+  }
+
+  function saveSettings(){
+    state.settings={
+      rate:clampNum("set-rate",1,100,80),
+      count:clampNum("set-count",1,9999,5),
+      time:clampNum("set-time",0.5,9999,5),
+      reveal:clampNum("set-reveal",1,60,3),
+      excludeOver:clampNum("set-exclude",1,3600,5)
+    };
+    let moved=0;
+    learning().forEach(q=>{ if(meetsCriteria(q)){ q.mastered=true; moved++; } });
+    persist(); renderManage();
+    toast(moved? `기준 저장 · ${moved}개 자동 이관` : "기준을 저장했어요");
+  }
+
+  /* ---------- backup / restore ---------- */
+  function exportData(){
+    const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const d=new Date(), pad=n=>String(n).padStart(2,"0");
+    const a=document.createElement("a");
+    a.href=url; a.download=`memocard-backup-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    toast("백업 파일을 내보냈어요");
+  }
+  function importData(file){
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{
+        const data=JSON.parse(reader.result);
+        if(!data||!Array.isArray(data.questions)) throw new Error("형식 오류");
+        if(!confirm("현재 데이터를 가져온 내용으로 교체할까요?\n되돌릴 수 없습니다.")) return;
+        state={
+          settings:Object.assign({rate:80,count:5,time:5,reveal:3,excludeOver:5},data.settings||{}),
+          questions:data.questions.map(normalizeQ),
+          quizScope:typeof data.quizScope==="string"?data.quizScope:""
+        };
+        persist(); cancelEdit(); manageFilter=""; renderManage();
+        toast(`가져오기 완료 · 질문 ${state.questions.length}개`);
+      }catch(e){ alert("가져오기 실패: 올바른 MemoCard 백업 파일이 아닙니다."); }
+    };
+    reader.readAsText(file);
+  }
+  function resetAll(){
+    if(!confirm("모든 질문과 기록을 삭제하고 초기 상태로 되돌릴까요?")) return;
+    state=makeDefaults(); manageFilter=""; cancelEdit(); persist(); renderManage();
+    toast("초기화했어요");
+  }
+
+  /* ---------- utils ---------- */
+  function esc(s){ return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+  function setVal(id,v){ const el=document.getElementById(id); if(el) el.value=v; }
+  function clampNum(id,min,max,fb){ let v=parseFloat(document.getElementById(id).value); if(isNaN(v))v=fb; return Math.min(max,Math.max(min,v)); }
+
+  /* ---------- wire ---------- */
+  document.getElementById("btn-add").onclick=addOrUpdate;
+  document.getElementById("btn-canceledit").onclick=cancelEdit;
+  document.getElementById("btn-savesettings").onclick=saveSettings;
+  document.getElementById("btn-export").onclick=exportData;
+  document.getElementById("btn-import").onclick=()=>document.getElementById("file-import").click();
+  document.getElementById("file-import").onchange=e=>{ if(e.target.files[0]) importData(e.target.files[0]); e.target.value=""; };
+  document.getElementById("btn-reset").onclick=resetAll;
+
+  renderQuiz();
+})();
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 }
+</script>
+</body>
+</html>
